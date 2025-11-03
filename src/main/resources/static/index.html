@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>URL Validator</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>URL Validator</h1>
+      <p class="lead">Enter a URL and the service will check if the site is reachable.</p>
+
+      <form id="checkForm" class="form">
+        <input id="urlInput" type="text" placeholder="https://example.com" required />
+        <button id="checkBtn" type="submit">Check URL</button>
+      </form>
+
+      <div id="result" class="result hidden">
+        <div id="status" class="status"></div>
+        <pre id="details" class="details"></pre>
+      </div>
+
+      <section class="examples">
+        <h3>Examples</h3>
+        <button class="example">https://google.com</button>
+        <button class="example">https://example.com</button>
+        <button class="example">https://thiswebsitedoesnotexist12345.com</button>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
