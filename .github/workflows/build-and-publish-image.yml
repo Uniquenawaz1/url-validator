@@ -35,5 +35,5 @@ jobs:
         with:
           context: .
           push: true
-          # GitHub owner may contain uppercase letters; docker tags must be lowercase
-          tags: ghcr.io/${{ toLower(github.repository_owner) }}/url-validator:latest
+          # use lowercase owner to satisfy docker tag requirements
+          tags: ghcr.io/uniquenawaz1/url-validator:latest
