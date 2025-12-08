@@ -1,6 +1,7 @@
 package com.urlvalidator.controller;
 
 import com.urlvalidator.service.UrlChecker;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +29,15 @@ public class UrlCheckController {
             return ResponseEntity.ok(Map.of("message", "✅ Valid website URL"));
         }
         return ResponseEntity.ok(Map.of("message", "❌ Invalid or unreachable website URL"));
+    }
+
+    // Debug endpoint: accept any content-type and return the raw body so we can see what the server receives.
+    @PostMapping(path = "/check-url-raw", consumes = MediaType.ALL_VALUE)
+    public ResponseEntity<?> checkUrlRaw(@RequestBody(required = false) String rawBody) {
+        if (rawBody == null) rawBody = "";
+        return ResponseEntity.ok(Map.of(
+                "receivedBody", rawBody
+        ));
     }
 
     @GetMapping("/health")
