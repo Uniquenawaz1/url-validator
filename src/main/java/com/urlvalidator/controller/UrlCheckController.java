@@ -24,11 +24,17 @@ public class UrlCheckController {
         if (url == null || url.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Missing url field"));
         }
-        boolean ok = checker.isReachable(url);
-        if (ok) {
-            return ResponseEntity.ok(Map.of("message", "✅ Valid website URL"));
+        
+        try {
+            boolean ok = checker.isReachable(url);
+            if (ok) {
+                return ResponseEntity.ok(Map.of("message", "✅ Valid website URL"));
+            }
+            return ResponseEntity.ok(Map.of("message", "❌ Invalid or unreachable website URL"));
+        } catch (Exception e) {
+            System.err.println("Error checking URL: " + e.getMessage());
+            return ResponseEntity.ok(Map.of("message", "❌ Invalid or unreachable website URL"));
         }
-        return ResponseEntity.ok(Map.of("message", "❌ Invalid or unreachable website URL"));
     }
 
     // Debug endpoint: accept any content-type and return the raw body so we can see what the server receives.
@@ -45,3 +51,4 @@ public class UrlCheckController {
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
 }
+

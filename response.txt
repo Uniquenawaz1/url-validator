@@ -1,0 +1,17 @@
+HTTP/1.1 400 Bad Request
+Date: Mon, 08 Dec 2025 13:13:40 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+CF-RAY: 9aac85798e2b9379-MAA
+rndr-id: 0a337994-fd7f-4ea2
+vary: Origin
+vary: Access-Control-Request-Method
+vary: Access-Control-Request-Headers
+vary: Accept-Encoding
+x-render-origin-server: Render
+cf-cache-status: DYNAMIC
+Server: cloudflare
+alt-svc: h3=":443"; ma=86400
+
+{"timestamp":"2025-12-08T13:13:40.119+00:00","status":400,"error":"Bad Request","path":"/api/check-url"}
