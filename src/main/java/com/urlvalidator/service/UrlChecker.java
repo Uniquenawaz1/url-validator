@@ -2,6 +2,8 @@ package com.urlvalidator.service;
 
 import org.springframework.stereotype.Service;
 
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -42,6 +44,22 @@ public class UrlChecker {
     private boolean isAcceptedStatus(int status) {
         // 2xx/3xx = success/redirect; 403/405/429 = blocked but site exists
         return (status >= 200 && status < 400) || status == 403 || status == 405 || status == 429;
+    }
+
+    // Fallback for sites that silently drop HTTP requests (no response) but are reachable at TCP level
+    private boolean isTcpReachable(URI uri) {
+        try {
+            String host = uri.getHost();
+            int port = uri.getPort() != -1 ? uri.getPort() : ("https".equals(uri.getScheme()) ? 443 : 80);
+            try (Socket socket = new Socket()) {
+                socket.connect(new InetSocketAddress(host, port), 5000);
+                System.out.println("[UrlChecker] TCP reachable: " + host + ":" + port);
+                return true;
+            }
+        } catch (Exception e) {
+            System.out.println("[UrlChecker] TCP not reachable: " + e.getMessage());
+            return false;
+        }
     }
 
     public boolean isReachable(String url) {
@@ -101,8 +119,13 @@ public class UrlChecker {
             return isAcceptedStatus(getResponse.statusCode());
             
         } catch (java.util.concurrent.TimeoutException e) {
-            System.out.println("[UrlChecker] Timeout: " + e.getMessage());
-            return false;
+            System.out.println("[UrlChecker] HTTP timeout — falling back to TCP check");
+            try {
+                URI uri = new URI(url);
+                return isTcpReachable(uri);
+            } catch (Exception ex) {
+                return false;
+            }
         } catch (Exception e) {
             System.out.println("[UrlChecker] Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             e.printStackTrace();
