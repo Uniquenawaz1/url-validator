@@ -2,7 +2,6 @@ package com.urlvalidator.service;
 
 import org.springframework.stereotype.Service;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -47,7 +46,7 @@ public class UrlChecker {
         return (status >= 200 && status < 400) || status == 403 || status == 405 || status == 429;
     }
 
-    // Fallback 1: sites that silently drop HTTP but accept TCP connections
+    // Fallback: sites that silently drop HTTP but accept TCP connections
     private boolean isTcpReachable(URI uri) {
         try {
             String host = uri.getHost();
@@ -59,19 +58,6 @@ public class UrlChecker {
             }
         } catch (Exception e) {
             System.out.println("[UrlChecker] TCP not reachable: " + e.getMessage());
-            // Fallback 2: DNS resolution — if the hostname resolves, the domain is real
-            return isDnsResolvable(uri.getHost());
-        }
-    }
-
-    // Fallback 2: cloud IPs are sometimes blocked at TCP level; DNS still works for real domains
-    private boolean isDnsResolvable(String host) {
-        try {
-            InetAddress address = InetAddress.getByName(host);
-            System.out.println("[UrlChecker] DNS resolved: " + host + " -> " + address.getHostAddress());
-            return true;
-        } catch (Exception e) {
-            System.out.println("[UrlChecker] DNS failed: " + e.getMessage());
             return false;
         }
     }
@@ -130,11 +116,8 @@ public class UrlChecker {
                 System.out.println("[UrlChecker] HTTP failed — trying TCP");
             }
 
-            // Step 2: TCP socket check (3s)
-            if (isTcpReachable(uri)) return true;
-
-            // Step 3: DNS resolution — catches cloud-IP-blocked sites like yatra.com
-            return isDnsResolvable(uri.getHost());
+            // Step 2: TCP socket check (3s) — for sites that silently drop HTTP
+            return isTcpReachable(uri);
 
         } catch (Exception e) {
             System.out.println("[UrlChecker] Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
