@@ -2,6 +2,7 @@ package com.urlvalidator.service;
 
 import org.springframework.stereotype.Service;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -46,7 +47,7 @@ public class UrlChecker {
         return (status >= 200 && status < 400) || status == 403 || status == 405 || status == 429;
     }
 
-    // Fallback for sites that silently drop HTTP requests (no response) but are reachable at TCP level
+    // Fallback 1: sites that silently drop HTTP but accept TCP connections
     private boolean isTcpReachable(URI uri) {
         try {
             String host = uri.getHost();
@@ -58,6 +59,19 @@ public class UrlChecker {
             }
         } catch (Exception e) {
             System.out.println("[UrlChecker] TCP not reachable: " + e.getMessage());
+            // Fallback 2: DNS resolution — if the hostname resolves, the domain is real
+            return isDnsResolvable(uri.getHost());
+        }
+    }
+
+    // Fallback 2: cloud IPs are sometimes blocked at TCP level; DNS still works for real domains
+    private boolean isDnsResolvable(String host) {
+        try {
+            InetAddress address = InetAddress.getByName(host);
+            System.out.println("[UrlChecker] DNS resolved: " + host + " -> " + address.getHostAddress());
+            return true;
+        } catch (Exception e) {
+            System.out.println("[UrlChecker] DNS failed: " + e.getMessage());
             return false;
         }
     }
