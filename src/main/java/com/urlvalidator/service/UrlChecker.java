@@ -53,7 +53,7 @@ public class UrlChecker {
             String host = uri.getHost();
             int port = uri.getPort() != -1 ? uri.getPort() : ("https".equals(uri.getScheme()) ? 443 : 80);
             try (Socket socket = new Socket()) {
-                socket.connect(new InetSocketAddress(host, port), 5000);
+                socket.connect(new InetSocketAddress(host, port), 3000);
                 System.out.println("[UrlChecker] TCP reachable: " + host + ":" + port);
                 return true;
             }
@@ -76,6 +76,13 @@ public class UrlChecker {
         }
     }
 
+    private boolean isTimeoutException(Exception e) {
+        Throwable cause = e.getCause() != null ? e.getCause() : e;
+        return e instanceof java.util.concurrent.TimeoutException
+                || cause instanceof java.net.http.HttpTimeoutException
+                || cause instanceof java.util.concurrent.TimeoutException;
+    }
+
     public boolean isReachable(String url) {
         System.out.println("[UrlChecker.isReachable] Called with: " + url);
 
@@ -87,64 +94,49 @@ public class UrlChecker {
             System.out.println("[UrlChecker] URL to check: " + url);
 
             URI uri = new URI(url);
-            System.out.println("[UrlChecker] URI parsed successfully");
 
-            // Try HEAD first
-            HttpRequest request = browserRequest(uri)
-                    .timeout(Duration.ofSeconds(10))
-                    .method("HEAD", HttpRequest.BodyPublishers.noBody())
-                    .build();
+            // Step 1: HEAD request (5s) — fast check
+            try {
+                HttpRequest request = browserRequest(uri)
+                        .timeout(Duration.ofSeconds(5))
+                        .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                        .build();
 
-            System.out.println("[UrlChecker] Request created, attempting to send...");
+                HttpResponse<Void> response = httpClient.sendAsync(request, HttpResponse.BodyHandlers.discarding())
+                        .get(6, TimeUnit.SECONDS);
 
-            CompletableFuture<HttpResponse<Void>> future = httpClient.sendAsync(
-                    request,
-                    HttpResponse.BodyHandlers.discarding()
-            );
+                System.out.println("[UrlChecker] HEAD response: " + response.statusCode());
 
-            System.out.println("[UrlChecker] Async request sent");
+                if (isAcceptedStatus(response.statusCode())) return true;
 
-            HttpResponse<Void> response = future.get(15, TimeUnit.SECONDS);
+                // HEAD returned a non-accepted status — try GET (only on bad status, not timeout)
+                System.out.println("[UrlChecker] HEAD status " + response.statusCode() + ", trying GET");
+                HttpRequest getRequest = browserRequest(uri)
+                        .timeout(Duration.ofSeconds(8))
+                        .GET()
+                        .build();
 
-            System.out.println("[UrlChecker] Got response: " + response.statusCode());
+                HttpResponse<Void> getResponse = httpClient.sendAsync(getRequest, HttpResponse.BodyHandlers.discarding())
+                        .get(9, TimeUnit.SECONDS);
 
-            if (isAcceptedStatus(response.statusCode())) {
-                System.out.println("[UrlChecker] ✓ URL is reachable");
-                return true;
-            }
+                System.out.println("[UrlChecker] GET response: " + getResponse.statusCode());
+                if (isAcceptedStatus(getResponse.statusCode())) return true;
 
-            // If HEAD returned an unexpected status, try GET
-            System.out.println("[UrlChecker] HEAD returned status " + response.statusCode() + ", trying GET");
-
-            HttpRequest getRequest = browserRequest(uri)
-                    .timeout(Duration.ofSeconds(15))
-                    .GET()
-                    .build();
-
-            CompletableFuture<HttpResponse<Void>> getfuture = httpClient.sendAsync(
-                    getRequest,
-                    HttpResponse.BodyHandlers.discarding()
-            );
-
-            HttpResponse<Void> getResponse = getfuture.get(20, TimeUnit.SECONDS);
-
-            System.out.println("[UrlChecker] GET response: " + getResponse.statusCode());
-
-            return isAcceptedStatus(getResponse.statusCode());
-            
-        } catch (Exception e) {
-            Throwable cause = e.getCause() != null ? e.getCause() : e;
-            boolean isTimeout = e instanceof java.util.concurrent.TimeoutException
-                    || cause instanceof java.net.http.HttpTimeoutException
-                    || cause instanceof java.util.concurrent.TimeoutException;
-            if (isTimeout) {
-                System.out.println("[UrlChecker] HTTP timeout — falling back to TCP check");
-                try {
-                    return isTcpReachable(new URI(url));
-                } catch (Exception ex) {
-                    return false;
+            } catch (Exception e) {
+                if (!isTimeoutException(e)) {
+                    System.out.println("[UrlChecker] Non-timeout exception: " + e.getClass().getSimpleName());
+                    // Non-timeout failure (e.g. SSL error, DNS failure at HTTP level) — skip to DNS check
                 }
+                System.out.println("[UrlChecker] HTTP failed — trying TCP");
             }
+
+            // Step 2: TCP socket check (3s)
+            if (isTcpReachable(uri)) return true;
+
+            // Step 3: DNS resolution — catches cloud-IP-blocked sites like yatra.com
+            return isDnsResolvable(uri.getHost());
+
+        } catch (Exception e) {
             System.out.println("[UrlChecker] Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             return false;
         }
