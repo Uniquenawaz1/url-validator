@@ -118,17 +118,20 @@ public class UrlChecker {
 
             return isAcceptedStatus(getResponse.statusCode());
             
-        } catch (java.util.concurrent.TimeoutException e) {
-            System.out.println("[UrlChecker] HTTP timeout — falling back to TCP check");
-            try {
-                URI uri = new URI(url);
-                return isTcpReachable(uri);
-            } catch (Exception ex) {
-                return false;
-            }
         } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            boolean isTimeout = e instanceof java.util.concurrent.TimeoutException
+                    || cause instanceof java.net.http.HttpTimeoutException
+                    || cause instanceof java.util.concurrent.TimeoutException;
+            if (isTimeout) {
+                System.out.println("[UrlChecker] HTTP timeout — falling back to TCP check");
+                try {
+                    return isTcpReachable(new URI(url));
+                } catch (Exception ex) {
+                    return false;
+                }
+            }
             System.out.println("[UrlChecker] Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
-            e.printStackTrace();
             return false;
         }
     }
